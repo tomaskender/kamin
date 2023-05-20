@@ -3,12 +3,25 @@ version: '2.4'
 services:
   streamlit:
     depends_on:
-      - mongodb
+      - dataloader
     build:
-      dockerfile: ./Dockerfile
-      context: ./
+      dockerfile: Dockerfile
+      context: web
+    environment:
+      DATALOADER_RPC_PORT: 9000
     ports:
       - '8501:8501'
+  dataloader:
+    depends_on:
+      - mongodb
+    build:
+      dockerfile: Dockerfile
+      context: dataloader
+    restart: always
+    environment:
+      RPC_PORT: 9000
+    ports:
+      - '9000:9000'
   mongodb:
     image: mongo:6-jammy
     restart: always
