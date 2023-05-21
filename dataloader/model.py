@@ -1,18 +1,20 @@
 from mongoengine import *
 
-class Property(Document):
-    id = IntField(required=True, unique=True, primary_key=True)
+class Property(EmbeddedDocument):
+    _id = IntField(required=True, primary_key=True)
     street = StringField(required=True)
-    property_type = StringField(required=True)
+    name = StringField(required=True)
     rooms = IntField(required=True)
     has_separate_kitchen = BooleanField(required=True)
-    house_size = IntField(required=True)
+    size = IntField(required=True)
     latitude = FloatField(required=True)
     longitude = FloatField(required=True)
     price = IntField(required=True)
+    checked = DateField(required=True)
 
 class Town(Document):
-    town = StringField(required=True, unique=True, primary_key=True)
+    _id = StringField(required=True, primary_key=True)
     added = DateField(required=True)
+    last_update = DateField(required=True)
     tracked = BooleanField(required=True, default=True)
-    properties = ListField(EmbeddedDocumentField(Property))
+    properties = EmbeddedDocumentListField(Property)

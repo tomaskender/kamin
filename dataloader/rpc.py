@@ -1,16 +1,36 @@
+from datetime import date
 import itertools
+from mongoengine import connect
+from model import *
 import os
 import pandas as pd
 import requests
+import subprocess
 import xmlrpc.server
 
+with open(os.environ['DB_USERNAME_FILE'], 'r') as f:
+    username = f.read().rstrip('\n')
+with open(os.environ['DB_PASSWORD_FILE'], 'r') as f:
+    password = f.read().rstrip('\n')
+
+connect(
+    db=os.environ['DB_NAME'],
+    username=username,
+    password=password,
+    host=f"mongodb://mongodb:{os.environ['DB_PORT']}")
 ESTATES_SELECTOR = ['_embedded', 'estates']
 
 class DataLoaderService:
-    def find(self, town):
+    def get_tracked_towns(self):
+        return Town.objects(tracked=True).to_json()
+    
+    def update(self, town_name):
+        t = Town.objects(_id=town_name)
+        t.update_one(set__last_update=date.today())
+
         dfs = []
         for i in itertools.count(start=0):
-            r = requests.get(f"https://www.sreality.cz/api/cs/v2/estates?category_main_cb=1&category_type_cb=1&per_page=999&region={town}&page={i}")
+            r = requests.get(f"https://www.sreality.cz/api/cs/v2/estates?category_main_cb=1&category_type_cb=1&per_page=999&region={town_name}&page={i}")
             if not r.ok:
                 raise Exception('Request to API failed')
 
@@ -23,11 +43,42 @@ class DataLoaderService:
                 break
 
             df = df[['name', 'locality', 'price', 'gps.lat', 'gps.lon', 'hash_id']].rename(columns={'gps.lat': 'lat', 'gps.lon': 'lon'})
-            df['rooms'] = df.name.str.extract(r'(?P<rooms>\d((\+kk)|(\+1)))')['rooms'].fillna('')
-            df['price_formatted'] = df.price.map('{:,.0f}'.format)
+            room_str = df.name.str.extract(r'(?P<rooms>\d((\+kk)|(\+1)))')['rooms'].fillna('')
+            df['rooms'] = room_str.str.extract(r'(?P<rooms>\d)')['rooms'].fillna(0).astype(int)
+            df['has_separate_kitchen'] = not room_str.str.contains('kk').any()
+            df['size'] = df.name.str.extract(r'(?P<size>\d+) m²')['size'].fillna(0).astype(int)
             dfs.append(df)
         df = pd.concat(dfs)
+        df.reset_index(inplace=True)
+
+        props = []
+        for prop in df.to_dict('records'):
+            p = Property(
+                _id=prop['hash_id'],
+                street=prop['locality'],
+                name=prop['name'],
+                rooms=prop['rooms'],
+                has_separate_kitchen=prop['has_separate_kitchen'],
+                size=prop['size'],
+                latitude=prop['lat'],
+                longitude=prop['lon'],
+                price=prop['price'],
+                checked=date.today()
+            )
+            props.append(p)
+        t.update(set__properties=props)
         return df.to_json()
+        
+    def find(self, town_name):
+        ts = Town.objects(_id=town_name)
+        if ts.count() == 0:
+            Town(_id=town_name, tracked=True, added=date.today(), last_update=date.today()).save()
+            return self.update(town_name)
+        else:
+            return ts.first().properties.to_json()
+
+# Launch autoscraper scheduler
+subprocess.Popen(["python3", "autoscraper.py"])
 
 server = xmlrpc.server.SimpleXMLRPCServer(('0.0.0.0', int(os.environ['RPC_PORT'])))
 server.register_instance(DataLoaderService())

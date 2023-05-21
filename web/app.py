@@ -1,4 +1,5 @@
 import folium
+import os
 import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
@@ -8,7 +9,7 @@ TITLE = 'KAMIN'
 CAPTION = 'Visualize houses and flats for sale'
 PLOT_COLORS = ['darkblue', 'darkpurple', 'orange', 'pink', 'darkgreen', 'darkred', 'lightgreen', 'cadetblue', 'red', 'white', 'lightgray', 'lightred', 'blue', 'purple', 'beige', 'black', 'green', 'gray', 'lightblue']
 
-@st.cache(show_spinner=False)
+@st.cache(show_spinner=True)
 def download_data(town):
     server = xmlrpc.client.ServerProxy(f"http://dataloader:{os.environ['DATALOADER_RPC_PORT']}")
     return server.find(town)
@@ -29,7 +30,7 @@ def main():
 
     df_json = download_data(city)
     df = pd.read_json(df_json)
-    if df:
+    if not df.empty:
         category = st.sidebar.selectbox('Flat category', ['Any'] + sorted(filter(None, df['rooms'].unique()))) # Display non-empty categories
         df = apply_filter(df, category)
         st.metric(label=category + ' flats available', value=len(df))
@@ -39,7 +40,7 @@ def main():
         for i, (category, df) in enumerate(df.groupby(['rooms'])):
             for _, flat in df.iterrows():
                 icon = folium.Icon(color=PLOT_COLORS[i % len(PLOT_COLORS)])
-                folium.Marker([flat.lat, flat.lon], tooltip=f"<strong>{flat['name']}</strong></br>Price: <strong>{flat.price_formatted}</strong> CZK", icon=icon).add_to(m)
+                folium.Marker([flat.lat, flat.lon], tooltip=f"<strong>{flat['name']}</strong></br>Price: <strong>{'{:,.0f}'.format(flat['price'])}</strong> CZK", icon=icon).add_to(m)
 
         st_folium(m, returned_objects=[])
     else:
