@@ -17,7 +17,7 @@ def download_data(town):
 @st.cache
 def apply_filter(df, category):
     if category != 'Any':
-        df = df[df.rooms == category]
+        df = df[df.rooms == int(category)]
     return df
 
 def main():
@@ -33,14 +33,14 @@ def main():
     if not df.empty:
         category = st.sidebar.selectbox('Flat category', ['Any'] + sorted(filter(None, df['rooms'].unique()))) # Display non-empty categories
         df = apply_filter(df, category)
-        st.metric(label=category + ' flats available', value=len(df))
+        st.metric(label=str(category) + ' room flats available', value=len(df))
         
-        m = folium.Map(location=[df.lat.mean(), df.lon.mean()])
+        m = folium.Map(location=[df.latitude.mean(), df.longitude.mean()])
         
         for i, (category, df) in enumerate(df.groupby(['rooms'])):
             for _, flat in df.iterrows():
                 icon = folium.Icon(color=PLOT_COLORS[i % len(PLOT_COLORS)])
-                folium.Marker([flat.lat, flat.lon], tooltip=f"<strong>{flat['name']}</strong></br>Price: <strong>{'{:,.0f}'.format(flat['price'])}</strong> CZK", icon=icon).add_to(m)
+                folium.Marker([flat.latitude, flat.longitude], tooltip=f"<strong>{flat['name']}</strong></br>Price: <strong>{'{:,.0f}'.format(flat['price'])}</strong> CZK", icon=icon).add_to(m)
 
         st_folium(m, returned_objects=[])
     else:

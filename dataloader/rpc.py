@@ -67,15 +67,16 @@ class DataLoaderService:
             )
             props.append(p)
         t.update(set__properties=props)
-        return df.to_json()
         
     def find(self, town_name):
-        ts = Town.objects(_id=town_name)
-        if ts.count() == 0:
-            Town(_id=town_name, tracked=True, added=date.today(), last_update=date.today()).save()
-            return self.update(town_name)
-        else:
-            return ts.first().properties.to_json()
+        if Town.objects(_id=town_name).count() == 0:
+            t = Town(_id=town_name, tracked=True, added=date.today(), last_update=date.today())
+            t.save()
+            self.update(town_name)
+
+        data = [doc.to_mongo().to_dict() for doc in Town.objects(_id=town_name).first().properties]
+        df = pd.DataFrame(data)
+        return df.to_json()
 
 # Launch autoscraper scheduler
 subprocess.Popen(["python3", "autoscraper.py"])
