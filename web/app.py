@@ -30,10 +30,12 @@ def main():
     st.caption(CAPTION)
 
     st.sidebar.title('Filter')
-    query = st.sidebar.text_input('Location', 'Brno')
-    location = st.sidebar.selectbox('Suggestions', ['<select>'] + suggest_location(query))
+    query = st.sidebar.text_input('Location Query', 'Brno')
+    suggestions = suggest_location(query)
+    suggestions = ['<select>'] + suggest_location(query) if len(suggestions) > 1 else suggestions
+    location = st.sidebar.selectbox('Location', suggestions)
 
-    if location != '<select>':
+    if location and location != '<select>':
         df_json = download_data(location)
         df = pd.read_json(df_json)
         if not df.empty:
