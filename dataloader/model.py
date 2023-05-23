@@ -1,7 +1,7 @@
 from mongoengine import *
 
 class Property(EmbeddedDocument):
-    _id = IntField(required=True, primary_key=True)
+    _id = IntField(required=True, index=True)
     street = StringField(required=True)
     name = StringField(required=True)
     rooms = IntField(required=True)
@@ -10,7 +10,7 @@ class Property(EmbeddedDocument):
     latitude = FloatField(required=True)
     longitude = FloatField(required=True)
     price = IntField(required=True)
-    checked = DateField(required=True)
+    checked = DateField(required=True, index=True)
 
 class Town(Document):
     _id = StringField(required=True, primary_key=True)
