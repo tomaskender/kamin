@@ -25,6 +25,7 @@ class DataLoaderService:
         return Town.objects(tracked=True).to_json()
     
     def update(self, town_name):
+        print(f"Scraping '{town_name}' from API", flush=True)
         t = Town.objects(_id=town_name)
         t.update_one(set__last_update=date.today())
 
@@ -42,6 +43,8 @@ class DataLoaderService:
                 # No more entries have been found
                 break
 
+            print(f"Processing page {i} from API", flush=True)
+
             df = df[['name', 'locality', 'price', 'gps.lat', 'gps.lon', 'hash_id']].rename(columns={'gps.lat': 'lat', 'gps.lon': 'lon'})
             room_str = df.name.str.extract(r'(?P<rooms>\d((\+kk)|(\+1)))')['rooms'].fillna('')
             df['rooms'] = room_str.str.extract(r'(?P<rooms>\d)')['rooms'].fillna(0).astype(int)
@@ -51,6 +54,7 @@ class DataLoaderService:
         df = pd.concat(dfs)
         df.reset_index(inplace=True)
 
+        print(f"Updating database with new entries for '{town_name}'", flush=True)
         props = []
         for prop in df.to_dict('records'):
             p = Property(
@@ -67,8 +71,10 @@ class DataLoaderService:
             )
             props.append(p)
         t.update(set__properties=props)
+        print(f"New entries for '{town_name}' have been written into database", flush=True)
         
     def find(self, town_name):
+        print(f"Finding entries for '{town_name}'..", flush=True)
         if Town.objects(_id=town_name).count() == 0:
             t = Town(_id=town_name, tracked=True, added=date.today(), last_update=date.today())
             t.save()
