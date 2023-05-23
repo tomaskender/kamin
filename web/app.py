@@ -11,7 +11,7 @@ PLOT_COLORS = ['darkblue', 'darkpurple', 'orange', 'pink', 'darkgreen', 'darkred
 
 server = xmlrpc.client.ServerProxy(f"http://dataloader:{os.environ['DATALOADER_RPC_PORT']}")
 
-def suggest_location(query):
+def suggest_location(query: str):
     return server.suggest(query)
 
 # TODO @st.cache(show_spinner=True)
@@ -31,25 +31,26 @@ def main():
 
     st.sidebar.title('Filter')
     query = st.sidebar.text_input('Location', 'Brno')
-    location = st.sidebar.selectbox('Suggestions', suggest_location(query))
+    location = st.sidebar.selectbox('Suggestions', ['<select>'] + suggest_location(query))
 
-    df_json = download_data(location)
-    df = pd.read_json(df_json)
-    if not df.empty:
-        category = st.sidebar.selectbox('Flat category', ['Any'] + sorted(filter(None, df['rooms'].unique()))) # Display non-empty categories
-        df = apply_filter(df, category)
-        st.metric(label=str(category) + ' room flats available', value=len(df))
-        
-        m = folium.Map(location=[df.latitude.mean(), df.longitude.mean()])
-        
-        for i, (category, df) in enumerate(df.groupby(['rooms'])):
-            for _, flat in df.iterrows():
-                icon = folium.Icon(color=PLOT_COLORS[i % len(PLOT_COLORS)])
-                folium.Marker([flat.latitude, flat.longitude], tooltip=f"<strong>{flat['name']}</strong></br>Price: <strong>{'{:,.0f}'.format(flat['price'])}</strong> CZK", icon=icon).add_to(m)
+    if location != '<select>':
+        df_json = download_data(location)
+        df = pd.read_json(df_json)
+        if not df.empty:
+            category = st.sidebar.selectbox('Flat category', ['Any'] + sorted(filter(None, df['rooms'].unique()))) # Display non-empty categories
+            df = apply_filter(df, category)
+            st.metric(label=str(category) + ' room flats available', value=len(df))
+            
+            m = folium.Map(location=[df.latitude.mean(), df.longitude.mean()])
+            
+            for i, (category, df) in enumerate(df.groupby(['rooms'])):
+                for _, flat in df.iterrows():
+                    icon = folium.Icon(color=PLOT_COLORS[i % len(PLOT_COLORS)])
+                    folium.Marker([flat.latitude, flat.longitude], tooltip=f"<strong>{flat['name']}</strong></br>Price: <strong>{'{:,.0f}'.format(flat['price'])}</strong> CZK", icon=icon).add_to(m)
 
-        st_folium(m, returned_objects=[])
-    else:
-        st.error(f"Location '{location}' has not been found!")
+            st_folium(m, returned_objects=[])
+        else:
+            st.error(f"Location '{location}' has not been found!")
 
 if __name__ == '__main__':
     main()

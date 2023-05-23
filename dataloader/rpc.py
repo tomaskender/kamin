@@ -37,7 +37,7 @@ class DataLoaderService:
     def suggest(self, query):
         print(f"Getting suggestions for '{query}' from API", flush=True)
         encoded_location = urllib.parse.quote(query)
-        r = requests.get(f"https://www.sreality.cz/api/v1/localities/suggest?category=municipality_cz,ward_cz,quarter_cz,street_cz&phrase={encoded_location}&limit=10")
+        r = requests.get(f"https://www.sreality.cz/api/v1/localities/suggest?category=municipality_cz&phrase={encoded_location}&limit=10")
         if not r.ok:
             raise Exception('Request to API failed')
 
