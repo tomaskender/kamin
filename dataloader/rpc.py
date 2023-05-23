@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import requests
 import subprocess
+import urllib.parse
 import xmlrpc.server
 
 with open(os.environ['DB_USERNAME_FILE'], 'r') as f:
@@ -20,18 +21,47 @@ connect(
     host=f"mongodb://mongodb:{os.environ['DB_PORT']}")
 ESTATES_SELECTOR = ['_embedded', 'estates']
 
+CATEGORY_ORDER = {
+    "region_cz": 0,
+    "district_cz": 1,
+    "municipality_cz": 2,
+    "ward_cz": 3,
+    "quarter_cz": 4,
+    "street_cz": 5
+}
+
 class DataLoaderService:
     def get_tracked_towns(self):
         return Town.objects(tracked=True).to_json()
     
+    def suggest(self, query):
+        print(f"Getting suggestions for '{query}' from API", flush=True)
+        encoded_location = urllib.parse.quote(query)
+        r = requests.get(f"https://www.sreality.cz/api/v1/localities/suggest?category=municipality_cz,ward_cz,quarter_cz,street_cz&phrase={encoded_location}&limit=10")
+        if not r.ok:
+            raise Exception('Request to API failed')
+
+        suggestions = r.json()['results']
+        print(f"Raw suggestions: {suggestions}", flush=True)
+        
+        # sort suggestions by their significance
+        suggestions = sorted(suggestions, key=lambda entry: CATEGORY_ORDER[entry['category']])
+        print(f"Sorted suggestions: {suggestions}", flush=True)
+        
+        # extract suggested names from json
+        suggestions = list(dict.fromkeys([urllib.parse.unquote(sug['userData']['suggestFirstRow']) for sug in suggestions]))
+        print(f"Found suggestions: {suggestions}", flush=True)
+        return suggestions
+
     def update(self, town_name):
         print(f"Scraping '{town_name}' from API", flush=True)
         t = Town.objects(_id=town_name)
         t.update_one(set__last_update=date.today())
 
         dfs = []
+        encoded_town_name = urllib.parse.quote(town_name)
         for i in itertools.count(start=0):
-            r = requests.get(f"https://www.sreality.cz/api/cs/v2/estates?category_main_cb=1&category_type_cb=1&per_page=999&region={town_name}&page={i}")
+            r = requests.get(f"https://www.sreality.cz/api/cs/v2/estates?category_main_cb=1&category_type_cb=1&per_page=999&region={encoded_town_name}&page={i}")
             if not r.ok:
                 raise Exception('Request to API failed')
 

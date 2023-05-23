@@ -9,9 +9,13 @@ TITLE = 'KAMIN'
 CAPTION = 'Visualize houses and flats for sale'
 PLOT_COLORS = ['darkblue', 'darkpurple', 'orange', 'pink', 'darkgreen', 'darkred', 'lightgreen', 'cadetblue', 'red', 'white', 'lightgray', 'lightred', 'blue', 'purple', 'beige', 'black', 'green', 'gray', 'lightblue']
 
-@st.cache(show_spinner=True)
+server = xmlrpc.client.ServerProxy(f"http://dataloader:{os.environ['DATALOADER_RPC_PORT']}")
+
+def suggest_location(query):
+    return server.suggest(query)
+
+# TODO @st.cache(show_spinner=True)
 def download_data(town):
-    server = xmlrpc.client.ServerProxy(f"http://dataloader:{os.environ['DATALOADER_RPC_PORT']}")
     return server.find(town)
 
 @st.cache
@@ -26,9 +30,10 @@ def main():
     st.caption(CAPTION)
 
     st.sidebar.title('Filter')
-    city = st.sidebar.text_input('City', 'Brno')
+    query = st.sidebar.text_input('Location', 'Brno')
+    location = st.sidebar.selectbox('Suggestions', suggest_location(query))
 
-    df_json = download_data(city)
+    df_json = download_data(location)
     df = pd.read_json(df_json)
     if not df.empty:
         category = st.sidebar.selectbox('Flat category', ['Any'] + sorted(filter(None, df['rooms'].unique()))) # Display non-empty categories
@@ -44,7 +49,7 @@ def main():
 
         st_folium(m, returned_objects=[])
     else:
-        st.error(city + ' has not been found!')
+        st.error(f"Location '{location}' has not been found!")
 
 if __name__ == '__main__':
     main()
